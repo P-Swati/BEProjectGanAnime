@@ -1,33 +1,32 @@
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 from torchvision.utils import save_image
+import matplotlib.pyplot as plt
 
 # Allowed colours
-hair_mapping =  ['orange', 'white', 'aqua', 'gray', 'green', 'red', 'purple', 
-                 'pink', 'blue', 'black', 'brown', 'blonde']
+hairClassesList =  ['pink', 'blue','orange',  'white','aqua', 'gray','purple', 
+                  'black', 'green', 'red','blonde','brown']
+eyeClassesList= ['pink','red','black', 'orange' , 'purple', 'yellow', 'aqua', 'green', 
+               'brown', 'blue']
 
-eye_mapping = ['black', 'orange', 'pink', 'yellow', 'aqua', 'purple', 'green', 
-               'brown', 'red', 'blue']
 
-def denorm(img):
-    """ Denormalize input image tensor. (From [0,1] -> [-1,1])
-    """
-	
-    output = img / 2 + 0.5
-    return output.clamp(0, 1)
 
-def save_model(model, optimizer, step, log, file_path):
+def storeModelParams(modRef, optRef, step, log, location):
 
-    state = {'model' : model.state_dict(),
-             'optim' : optimizer.state_dict(),
+    state = {'model' : modRef.state_dict(),
+             'optim' : optRef.state_dict(),
              'step' : step,
              'log' : log}
-    torch.save(state, file_path)
+
+    torch.save(state, location)
     return
 
-def load_model(model, optimizer, file_path):
+def denorm(image):	
+    denormForm = image / 2 + 0.5
+    return denormForm.clamp(0, 1)
+
+def getModelParams(model, optimizer, file_path):
 
     prev_state = torch.load(file_path)
     
@@ -37,12 +36,7 @@ def load_model(model, optimizer, file_path):
     log = prev_state['log']
     
     return model, optimizer, start_step, log
-    
-def show_process(total_steps, step_i, g_log, d_log, classifier_log):
 
-    print('Step {}/{}: G_loss [{:8f}], D_loss [{:8f}], Classifier loss [{:8f}]'.format(
-            step_i, total_steps, g_log[-1], d_log[-1], classifier_log[-1]))
-    return
 
 def plot_loss(g_log, d_log, file_path):
 
@@ -55,23 +49,14 @@ def plot_loss(g_log, d_log, file_path):
     plt.close()
     return
 
-def plot_classifier_loss(log, file_path):
-    
-    steps = list(range(len(log)))
-    plt.semilogy(steps, log)
-    plt.legend(['Classifier Loss'])
-    plt.title("Classifier Loss ({} steps)".format(len(steps)))
-    plt.savefig(file_path)
-    plt.close()
-    return
 
-def get_random_label(batch_size, hair_classes, hair_prior, eye_classes, eye_prior):
+def get_random_label(batch_size, hair_classes, eye_classes):
     
-    hair_code = torch.zeros(batch_size, hair_classes)  # One hot encoding for hair class
-    eye_code = torch.zeros(batch_size, eye_classes)  # One hot encoding for eye class
+    hair_code = torch.zeros(batch_size, hair_classes)  
+    eye_code = torch.zeros(batch_size, eye_classes)  
 
-    hair_type = np.random.choice(hair_classes, batch_size, p = hair_prior)  # Sample hair class from hair class prior
-    eye_type = np.random.choice(eye_classes, batch_size, p = eye_prior)  # Sample eye class from eye class prior
+    hair_type = np.random.choice(hair_classes, batch_size)  # Sample hair class from hair class prior
+    eye_type = np.random.choice(eye_classes, batch_size)  # Sample eye class from eye class prior
     
     for i in range(batch_size):
         hair_code[i][hair_type[i]] = 1
@@ -79,23 +64,23 @@ def get_random_label(batch_size, hair_classes, hair_prior, eye_classes, eye_prio
 
     return torch.cat((hair_code, eye_code), dim = 1) 
 
-def generation_by_attributes(model, device, latent_dim, hair_classes, eye_classes, 
-    sample_dir, step = None, fix_hair = None, fix_eye = None):
-    
-    hair_tag = torch.zeros(64, hair_classes).to(device)
-    eye_tag = torch.zeros(64, eye_classes).to(device)
-    hair_class = np.random.randint(hair_classes)
-    eye_class = np.random.randint(eye_classes)
+def generateByHairEye(modelRef, device, lD, hairClasses, eyeClasses, 
+    Dpath, step = None, hairColor = None, eyeColor = None):
+    weight=1
+    bias=0
+    vecSize=64
 
-    for i in range(64):
-    	hair_tag[i][hair_class], eye_tag[i][eye_class] = 1, 1
+    hairColorVec = torch.zeros(vecSize, hairClasses).to(device)
+    eyeColorVec = torch.zeros(vecSize, eyeClasses).to(device)
+    hairClass = np.random.randint(hairClasses)
+    eyeClass = np.random.randint(eyeClasses)
 
-    tag = torch.cat((hair_tag, eye_tag), 1)
-    z = torch.randn(64, latent_dim).to(device)
+    for i in range(vecSize):
+    	hairColorVec[i][hairClass]=1
+	eyeColorVec[i][eyeClass] = 1
 
-    output = model(z, tag)
-    if step is not None:
-        file_path = '{} hair {} eyes, step {}.png'.format(hair_mapping[hair_class], eye_mapping[eye_class], step)
-    else:
-        file_path = '{} hair {} eyes.png'.format(hair_mapping[hair_class], eye_mapping[eye_class])
-    save_image(denorm(output), os.path.join(sample_dir, file_path))
+    concate = torch.cat((hairColorVec, eyeColorVec), 1)
+    z = torch.randn(vecSize, lD).to(device)
+
+    output = modelRef(z, tag)
+    save_image(denorm(output), os.path.join(Dpath, '/{} hair {} eyes.png'.format(hairColor,eyeColor)))
