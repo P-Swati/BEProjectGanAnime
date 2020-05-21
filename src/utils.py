@@ -28,14 +28,15 @@ def denorm(image):
 
 def getModelParams(model, optimizer, file_path):
 
-    prev_state = torch.load(file_path)
+    loadPrev = torch.load(file_path)
     
-    model.load_state_dict(prev_state['model'])
-    optimizer.load_state_dict(prev_state['optim'])
-    start_step = prev_state['step']
-    log = prev_state['log']
+    optimizer.load_state_dict(loadPrev['optim'])
+    model.load_state_dict(loadPrev['model'])
     
-    return model, optimizer, start_step, log
+    resumeFromStep = loadPrev['step']
+    log = loadPrev['log']
+    
+    return model, optimizer, resumeFromStep, log
 
 
 def plot_loss(g_log, d_log, file_path):
@@ -50,19 +51,19 @@ def plot_loss(g_log, d_log, file_path):
     return
 
 
-def get_random_label(batch_size, hair_classes, eye_classes):
+def getRandomLable(batch, hair_cl, eye_cl):
+	
+    hair_type = np.random.choice(hair_cl, batch) 
+    eye_type = np.random.choice(eye_cl, batch)
     
-    hair_code = torch.zeros(batch_size, hair_classes)  
-    eye_code = torch.zeros(batch_size, eye_classes)  
-
-    hair_type = np.random.choice(hair_classes, batch_size)  # Sample hair class from hair class prior
-    eye_type = np.random.choice(eye_classes, batch_size)  # Sample eye class from eye class prior
+    hCode = torch.zeros(batch, hair_cl)  
+    eCode = torch.zeros(batch, eye_cl)    
     
-    for i in range(batch_size):
-        hair_code[i][hair_type[i]] = 1
-        eye_code[i][eye_type[i]] = 1
+    for i in range(batch):
+        hCode[i][hair_type[i]] = 1
+        eCode[i][eye_type[i]] = 1
 
-    return torch.cat((hair_code, eye_code), dim = 1) 
+    return torch.cat((hCode, eCode), dim = 1) 
 
 def generateByHairEye(modelRef, device, lD, hairClasses, eyeClasses, 
     Dpath, step = None, hairColor = None, eyeColor = None):
@@ -82,5 +83,5 @@ def generateByHairEye(modelRef, device, lD, hairClasses, eyeClasses,
     concate = torch.cat((hairColorVec, eyeColorVec), 1)
     z = torch.randn(vecSize, lD).to(device)
 
-    output = modelRef(z, tag)
+    output = modelRef(z, concate)
     save_image(denorm(output), os.path.join(Dpath, '/{} hair {} eyes.png'.format(hairColor,eyeColor)))
