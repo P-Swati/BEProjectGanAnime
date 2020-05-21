@@ -8,44 +8,53 @@ import numpy as np
 class DataLoad:
 
     def __init__(self, root, tagsPickle, transFunc):
+        try:
         with open(tagsPickle, 'rb') as file:
             self.tagsPickle = pickle.load(file) 
+        except:
+            print("pickle file not found")
         self.root = root
-        self.transFunc = transFunc
         self.images = os.listdir(self.root)
-        self.lengthOfDataset = len(self.images)
+        self.transFunc = transFunc
         self.fileType='.jpg'
-    
-    def length(self):
-        return self.lengthOfDataset
-    
-    def getTuple(self, row):
-
-        hairClass, eyeClass = self.tags_file[row]
+        self.lengthOfDataset = len(self.images)
         
+    
+    
+    def getTuple(self, row): 
         ipath = os.path.join(self.root, str(row) + self.fileType)
+        hairClass, eyeClass = self.tags_file[row]
         pic = cv2.imread(ipath)
         # (BGR -> RGB)
-        pic = pic[:, :, (2, 1, 0)]  
-            						 
+        pic = pic[:, :, (2, 1, 0)]    						 
         if self.transFunc:
-            finalPic = self.transform(pic)
+            finalPic = self.transFunc(pic)
         return finalPic, hairClass, eyeClass
+
+    def length(self):
+        return self.lengthOfDataset
 
 class RandomBatchGetter:
     def __init__(self, data, batch):
         self.data = data
-        self.bSize = batch
         self.lenOfDataset = self.data.length()
+        self.bSize = batch
     
     def getDataBatch(self):
         indexList = np.random.choice(self.lenOfDataset, self.bSize)
-        imageBatch, hairClassVec, eyeClassVec = [], [], []
+        imageBatch = list()
+        hairClassVec=list()
+        eyeClassVec =list()
         for idx in indexList:
             img, hairClass, eyeClass = self.data.getTuple(idx)
-            imageBatch.append(img.unsqueeze(0))
-            hairClassVec.append(hairClass.unsqueeze(0))
-            eyeClassVec.append(eyeClass.unsqueeze(0))
+            imgUnsq= img.unsqueeze(0)
+            hairUnsq= hairClass.unsqueeze(0)
+            eyeUnsq= eyeClass.unsqueeze(0)
+                
+            imageBatch.append(imgUnsq)
+            hairClassVec.append(hairUnsq)
+            eyeClassVec.append(eyeUnsq)
+        
         imageBatch = torch.cat(imageBatch, 0)
         hairClassVec = torch.cat(hairClassVec, 0)
         eyeClassVec = torch.cat(eyeClassVec, 0)
