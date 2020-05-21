@@ -1,19 +1,23 @@
 import torch
 import torch.nn
 import torch.optim as optim
-import torchvision.transforms as Transform
 from torchvision.utils import save_image
-
-import numpy as np
+import torchvision.transforms as Transform
+import folium
+from folium import plugins
+from PIL import Image
 import os
-
+import numpy as np
+import utils
 import datasets
 import ACGAN
-import utils
-from argparse import ArgumentParser
+import anvil.media
 
-hair_mapping =  ['orange', 'white', 'aqua', 'gray', 'green', 'red', 'purple', 
-                 'pink', 'blue', 'black', 'brown', 'blonde']
+hair_mapping =  ['orange', 'white','aqua', 'gray', 'green', 'red', 'purple', 
+                 'pink', 'blue', 'black', 'brown','blonde']
+eye_mapping = ['black', 'orange', 'pink', 'yellow', 'aqua', 'purple', 'green', 
+               'brown', 'red', 'blue']
+
 hair_dict = {
     'orange' : 0,
     'white': 1, 
@@ -29,8 +33,6 @@ hair_dict = {
     'blonde': 11
 }
 
-eye_mapping = ['black', 'orange', 'pink', 'yellow', 'aqua', 'purple', 'green', 
-               'brown', 'red', 'blue']
 eye_dict = {
     'black': 0,
     'orange': 1,
@@ -44,62 +46,43 @@ eye_dict = {
     'blue': 9
 }
 
-
-parser = ArgumentParser()
-parser.add_argument('-t', '--type', help = 'Type of anime generation.', 
-                    choices = ['fix_noise', 'fix_hair_eye', 'change_hair', 'change_eye', 'interpolate'], 
-                    default = 'fix_noise', type = str)
-parser.add_argument('--hair', help = 'Determine the hair color of the anime characters.', 
-                    default = None, choices = hair_mapping, type = str)
-parser.add_argument('--eye',  help = 'Determine the eye color of the anime characters.',
-                    default = None, choices = eye_mapping, type = str)
-parser.add_argument('-s', '--sample_dir', help = 'Folder to save the generated samples.',
-                    default = '../generated', type = str)
-parser.add_argument('-d', '--model_dir', help = 'Folder where the trained model is saved',
-                    default = '../models', type = str)
-args = parser.parse_args()
-
-def generate_by_attributes(model, device, latent_dim, hair_classes, eye_classes, hair_color, eye_color):
-    hair_tag = torch.zeros(64, hair_classes).to(device)
-    eye_tag = torch.zeros(64, eye_classes).to(device)
-    hair_class = hair_dict[hair_color]
-    eye_class = eye_dict[eye_color]
+def generateUsingHairEye(model, device, hair_classes, eye_classes, lDim, hColor, eColor):
+    htag = torch.zeros(64, hair_classes).to(device)
+    etag = torch.zeros(64, eye_classes).to(device)
+    hairLabelIndex = hair_dict[hColor]
+    eyeLabelIndex = eye_dict[eColor]
     for i in range(64):
-        hair_tag[i][hair_class], eye_tag[i][eye_class] = 1, 1
+        htag[i][hairLabelIndex]=1
+        etag[i][eyeLabelIndex] = 1
     
-    tag = torch.cat((hair_tag, eye_tag), 1)
-    z = torch.randn(64, latent_dim).to(device)
+    fulltag = torch.cat((htag, etag), 1)
+    z = torch.randn(64, lDim).to(device)
     
     output = model(z, tag)
-    save_image(utils.denorm(output), '{}/{} hair {} eyes.png'.format(args.sample_dir, hair_mapping[hair_class], eye_mapping[eye_class]))
+    save_image(utils.denorm(output), '../generated/{} hair {} eyes.png'.format(hair_mapping[hairLabelIndex], eye_mapping[eyeLabelIndex]))
 
-        
-def main():
-    if not os.path.exists(args.sample_dir):
-        os.mkdir(args.sample_dir)
-    latent_dim = 100
-    hair_classes = 12
-    eye_classes = 10
+def add(hair,eye):
+    return hair+eye
+
+@anvil.server.callable   
+def main(hairColor,eyeColor):
+    if not os.path.exists('../generated'):
+        os.mkdir('../generated')
+    hairClasses = 12
+    eyeClasses = 10
     batch_size = 1
+    totalClasses = add(hairClasses,eyeClasses)
+    latentDim = 100
+    
+    G_path = '/content/BeProjectGANAnime/src/mymodel/ACGAN_generator.ckpt'
 
-    device = 'cpu'
-    G_path = '{}/ACGAN_generator.ckpt'.format(args.model_dir)
-
-    G = G = ACGAN.Generator(latent_dim = latent_dim, class_dim = hair_classes + eye_classes)
-    prev_state = torch.load(G_path)
-    G.load_state_dict(prev_state['model'])
+    G = ACGAN.MyConGANGen(latentVectorSize = latent_dim, classVectorSize = totalClasses)
+    previouslyTrainedstate = torch.load(G_path)
+    
+    print("load state info..")
+    G.load_state_dict(previouslyTrainedstate['model'])
     G = G.eval()
 
-    if args.type == 'fix_hair_eye':
-        generate_by_attributes(G, device, latent_dim, hair_classes, eye_classes, args.hair,  args.eye)
-    elif args.type == 'change_eye':
-        eye_grad(G, device, latent_dim, hair_classes, eye_classes)
-    elif args.type == 'change_hair':
-        hair_grad(G, device, latent_dim, hair_classes, eye_classes)
-    elif args.type == 'interpolate':
-        interpolate(G, device, latent_dim, hair_classes, eye_classes)
-    else:
-        fix_noise(G, device, latent_dim, hair_classes, eye_classes)
-    
-if __name__ == "__main__":
-    main()
+    generateUsingHairEye(G, 'cpu',hairClasses, eyeClasses, latentDim,hairColor, eyeColor)
+
+    return(anvil.media.from_file('/content/BeProjectGANAnime/generated/{} hair {} eyes.png'.format(hair,eye)))
