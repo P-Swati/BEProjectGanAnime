@@ -14,10 +14,12 @@ class MyConGANGen(nn.Module):
         self.lD = latentVectorSize*self.weight + self.bias
         self.cD = classVectorSize*self.weight + self.bias
 	
-
+	def concatenate(a,b):
+		return a+b
+	
         self.PackedLayersofGen = nn.Sequential(
 			#layer 1
-                    CT2d(in_channels = self.lD + self.cD, #concatenate latent and class vec
+                    CT2d(in_channels = concatenate(self.lD,self.cD), #concatenate latent and class vec
                                        out_channels = 1024, 
                                        kernel_size = 4,
                                        stride = 1,
@@ -77,8 +79,10 @@ class MyConGANGen(nn.Module):
 class MyConDisc(nn.Module):
     def __init__(self, countOfClasses):
         super(MyConDisc, self).__init__()
-	print("total
+	
+	print("total number of classes:")
 	print(countOfClasses)
+	
         self.countOfClasses = countOfClasses
         self.PackedLayersOfDisc = nn.Sequential(
                     C2d(in_channels = 3, 
@@ -116,7 +120,7 @@ class MyConDisc(nn.Module):
                     BN2d(1024),
                     nn.LeakyReLU(0.2, inplace = True)
                     )  
-	
+	print("packing discriminator dense layers finished..")
 	
         self.bin_classifier = nn.Sequential(
                     C2d(in_channels = 1024, 
@@ -125,6 +129,8 @@ class MyConDisc(nn.Module):
                         stride = 1),
                     nn.Sigmoid()
                     ) 
+	
+	print("Binary classifier layer initialized..")
 	
 	
         self.extraBotNeck = nn.Sequential(
@@ -135,16 +141,19 @@ class MyConDisc(nn.Module):
                     BN2d(512),
                     nn.LeakyReLU(0.2)
                     )
+	print("added an extra layer to compensate for size of input to ouput channel")
 	
         self.multilableClassificationLayer = nn.Sequential(
                     nn.Linear(512, self.countOfClasses),
                     nn.Sigmoid()
                     )
+	print("multilable classifier layer created..")
         return
     
     def forward(self, ipBatch):
-	
-        extrFeat = self.PackedLayersOfDisc(ipBatch)  
+        extrFeat = self.PackedLayersOfDisc(ipBatch) 
+	print("feature extracted")
+	print(extrFeat)
         realOrFake = self.bin_classifier(extrFeat).view(-1) 
         flatten = self.extraBotNeck(extrFeat).squeeze()
         multiLabOutput = self.multilableClassificationLayer(flatten)
@@ -156,7 +165,10 @@ if __name__ == '__main__':
     batch = 5
     lVec = torch.randn(batch, latentVectorSize)
     cVec = torch.randn(batch, classVectorSize)
-    
+    print("random vector:")
+    print(lVec)
+    print("class vector")
+    print(cVec)
     GenObject = MyConGANGen(latentVectorSize, classVectorSize)
     DiscObject = MyConDisc(classVectorSize)
     o = GenObject(lVec, cVec)
