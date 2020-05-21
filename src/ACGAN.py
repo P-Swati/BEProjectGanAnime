@@ -8,9 +8,12 @@ class MyConGANGen(nn.Module):
     def __init__(self, latentVectorSize, classVectorSize):
 	
         super(MyConGANGen, self).__init__()
-        
-        self.lD = latentVectorSize
-        self.cD = classVectorSize
+	
+        self.weight=1
+	self.bias=0
+        self.lD = latentVectorSize*self.weight + self.bias
+        self.cD = classVectorSize*self.weight + self.bias
+	
 
         self.PackedLayersofGen = nn.Sequential(
 			#layer 1
@@ -59,14 +62,23 @@ class MyConGANGen(nn.Module):
         return
     
     def forward(self, ipVec, classVec):
+	print("inside forward function")
         finalVec = torch.cat((ipVec, classVec), dim = 1)  # Concatenate noise and class vector.
+	print("final appended vector to be fed =")
+	print(finalVec)
         finalVec = finalVec.unsqueeze(2).unsqueeze(3)  # 2 for dimesions, 3 for color channels
-        return self.PackedLayersofGen(finalVec)
+	print("resized final vector =")
+	print(finalVec)
+	print("pass this to gen input layer and return obtained output")
+        temp=self.PackedLayersofGen(finalVec)
+	print(temp)
+	return temp
 
-class MyConGANDisc(nn.Module):
+class MyConDisc(nn.Module):
     def __init__(self, countOfClasses):
-        super(MyConGANDisc, self).__init__()
-
+        super(MyConDisc, self).__init__()
+	print("total
+	print(countOfClasses)
         self.countOfClasses = countOfClasses
         self.PackedLayersOfDisc = nn.Sequential(
                     C2d(in_channels = 3, 
@@ -146,7 +158,7 @@ if __name__ == '__main__':
     cVec = torch.randn(batch, classVectorSize)
     
     GenObject = MyConGANGen(latentVectorSize, classVectorSize)
-    DiscObject = MyConGANDisc(classVectorSize)
+    DiscObject = MyConDisc(classVectorSize)
     o = GenObject(lVec, cVec)
 #     print(o.shape)
     x, y = DiscObject(o)
