@@ -26,9 +26,9 @@ def denorm(image):
     denormForm = image / 2 + 0.5
     return denormForm.clamp(0, 1)
 
-def getModelParams(model, optimizer, file_path):
+def getModelParams(model, optimizer, filePath):
 
-    loadPrev = torch.load(file_path)
+    loadPrev = torch.load(filePath)
     
     optimizer.load_state_dict(loadPrev['optim'])
     model.load_state_dict(loadPrev['model'])
@@ -39,14 +39,14 @@ def getModelParams(model, optimizer, file_path):
     return model, optimizer, resumeFromStep, log
 
 
-def plot_loss(g_log, d_log, file_path):
+def plot_loss(g_log, d_log, fPath):
 
     steps = list(range(len(g_log)))
     plt.semilogy(steps, g_log)
     plt.semilogy(steps, d_log)
     plt.legend(['Generator Loss', 'Discriminator Loss'])
     plt.title("Loss ({} steps)".format(len(steps)))
-    plt.savefig(file_path)
+    plt.savefig(fPath)
     plt.close()
     return
 
