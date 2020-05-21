@@ -6,10 +6,9 @@ from torchvision.utils import save_image
 
 import numpy as np
 import os
-from argparse import ArgumentParser
 
-from datasets import Anime, Shuffler
-from ACGAN import Generator, Discriminator
+from datasets import DataLoad, RandomBatchGetter
+from ACGAN import MyConGANGen, MyConDisc
 from utils import save_model, denorm, plot_loss, plot_classifier_loss, show_process
 from utils import generation_by_attributes, get_random_label
 
@@ -38,35 +37,29 @@ parser.add_argument('--aux', '--classification_weight', help = 'Classification l
                     default = 1, type = float)
 args = parser.parse_args()
 
-if args.device == 'cuda' and not torch.cuda.is_available():
-    print("Your device currenly doesn't support CUDA.")
-    exit()
-print('Using device: {}'.format(args.device))
+device='cuda'
 
 def main():
-    batch_size = args.batch_size
-    iterations =  args.iterations
-    device = args.device
+    batch_size = 128
+    iterations =  40000
+    device='cuda'
     
-    hair_classes, eye_classes = 12, 10
-    num_classes = hair_classes + eye_classes
-    latent_dim = 100
+    hairClassCount= 12
+    eyeClassCount=10
+    totalNumOfClasses = hairClassCount + eyeClassCount
+    latentVecDim = 100
     
-    config = 'ACGAN-batch_size-[{}]-steps-[{}]'.format(batch_size, iterations)
-    print('Configuration: {}'.format(config))
-    
-    
-    root_dir = '../{}/images'.format(args.train_dir)
-    tags_file = '../{}/tags.pickle'.format(args.train_dir)
-    hair_prior = np.load('../{}/hair_prob.npy'.format(args.train_dir))
-    eye_prior = np.load('../{}/eye_prob.npy'.format(args.train_dir))
-
-    random_sample_dir = '../{}/{}/random_generation'.format(args.sample_dir, config)
-    fixed_attribute_dir = '../{}/{}/fixed_attributes'.format(args.sample_dir, config)
+    print("Batch Size : ",batch_size)
+    print("Iterations : ",iterations)
+   
+    root='C:/Users/acer/Documents/college/BEProject/images'
+    tags='C:/Users/acer/Documents/college/BEProject/features.pickle'
+   
+    fixed_attribute_dir = '../{}/{}/results'.format(args.sample_dir, config)
     checkpoint_dir = '../{}/{}'.format(args.checkpoint_dir, config)
     
-    if not os.path.exists(random_sample_dir):
-    	os.makedirs(random_sample_dir)
+    
+    
     if not os.path.exists(fixed_attribute_dir):
     	os.makedirs(fixed_attribute_dir)
     if not os.path.exists(checkpoint_dir):
@@ -77,8 +70,8 @@ def main():
     transform = Transform.Compose([Transform.ToTensor(),
                                    Transform.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-    dataset = Anime(root_dir = root_dir, tags_file = tags_file, transform = transform)
-    shuffler = Shuffler(dataset = dataset, batch_size = args.batch_size)
+    dataset = DataLoad(root_dir = root, tagsPickle = tags_file, transFunc = transform)
+    shuffler = RandomBatchGetter(dataset = dataset, batch_size = args.batch_size)
     
     G = Generator(latent_dim = latent_dim, class_dim = num_classes).to(device)
     D = Discriminator(num_classes = num_classes).to(device)
