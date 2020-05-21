@@ -1,61 +1,55 @@
 import torch
 import torch.nn as nn
+import torch.nn.ConvTranspose2d as CT2d
+import torch.nn.BatchNorm2d as BN2d
+import torch.nn.Conv2d as C2d
 
-    
-class Generator(nn.Module):
-    """ ACGAN generator.
-    
-    ACGAN generator is simply a DCGAN generator that takes a noise vector and 
-    class vector concatenated as input. All other details (activation functions,
-    batch norm) follow the 2016 DCGAN paper.
-    Attributes:
-        latent_dim: the length of the noise vector
-        class_dim: the length of the class vector (in one-hot form)
-        gen: the main generator structure
-    """
-
-
-    def __init__(self, latent_dim, class_dim):
-        """ Initializes Generator Class with latent_dim and class_dim."""
-        super(Generator, self).__init__()
+class MyConGANGen(nn.Module):
+    def __init__(self, latentVectorSize, classVectorSize):
+	
+        super(MyConGANGen, self).__init__()
         
-        self.latent_dim = latent_dim
-        self.class_dim = class_dim
+        self.lD = latentVectorSize
+        self.cD = classVectorSize
 
-        self.gen = nn.Sequential(
-                    nn.ConvTranspose2d(in_channels = self.latent_dim + 
-                    								 self.class_dim, 
+        self.PackedLayersofGen = nn.Sequential(
+			#layer 1
+                    CT2d(in_channels = self.lD + self.cD, #concatenate latent and class vec
                                        out_channels = 1024, 
                                        kernel_size = 4,
                                        stride = 1,
                                        bias = False),
-                    nn.BatchNorm2d(1024),
+                    BN2d(1024),
                     nn.ReLU(inplace = True),
-                    nn.ConvTranspose2d(in_channels = 1024,
+			#layer 2
+                    CT2d(in_channels = 1024,
                                        out_channels = 512,
                                        kernel_size = 4,
                                        stride = 2,
                                        padding = 1,
                                        bias = False),
-                    nn.BatchNorm2d(512),
+                    BN2d(512),
                     nn.ReLU(inplace = True),
-                    nn.ConvTranspose2d(in_channels = 512,
+			#layer 3
+                    CT2d(in_channels = 512,
                                        out_channels = 256,
                                        kernel_size = 4,
                                        stride = 2,
                                        padding = 1,
                                        bias = False),
-                    nn.BatchNorm2d(256),
+                    BN2d(256),
                     nn.ReLU(inplace = True),
-                    nn.ConvTranspose2d(in_channels = 256,
+			#layer 4
+                    CT2d(in_channels = 256,
                                        out_channels = 128,
                                        kernel_size = 4,
                                        stride = 2,
                                        padding = 1,
                                        bias = False),
-                    nn.BatchNorm2d(128),
+                    BN2d(128),
                     nn.ReLU(inplace = True),
-                    nn.ConvTranspose2d(in_channels = 128,
+			#layer 5
+                    CT2d(in_channels = 128,
                                        out_channels = 3,
                                        kernel_size = 4,
                                        stride = 2,
@@ -64,124 +58,96 @@ class Generator(nn.Module):
                     )
         return
     
-    def forward(self, _input, _class):
-        """ Defines the forward pass of the Generator Class.
-        Args:
-            _input: the input noise vector.
-            _class: the input class vector. The vector need not be one-hot 
-                    since multilabel generation is supported.
-        
-        Returns:
-            The generator output.
-        """
+    def forward(self, ipVec, classVec):
+        finalVec = torch.cat((ipVec, classVec), dim = 1)  # Concatenate noise and class vector.
+        finalVec = finalVec.unsqueeze(2).unsqueeze(3)  # 2 for dimesions, 3 for color channels
+        return self.PackedLayersofGen(finalVec)
 
+class MyConGANDisc(nn.Module):
+    def __init__(self, countOfClasses):
+        super(MyConGANDisc, self).__init__()
 
-        concat = torch.cat((_input, _class), dim = 1)  # Concatenate noise and class vector.
-        concat = concat.unsqueeze(2).unsqueeze(3)  # Reshape the latent vector into a feature map.
-        return self.gen(concat)
-
-class Discriminator(nn.Module):
-    """ ACGAN discriminator.
-    
-    A modified version of the DCGAN discriminator. Aside from a discriminator
-    output, DCGAN discriminator also classifies the class of the input image 
-    using a fully-connected layer.
-
-    Attributes:
-    	num_classes: number of classes the discriminator needs to classify.
-    	conv_layers: all convolutional layers before the last DCGAN layer. 
-    				 This can be viewed as an feature extractor.
-    	discriminator_layer: last layer of DCGAN. Outputs a single scalar.
-    	bottleneck: Layer before classifier_layer.
-    	classifier_layer: fully conneceted layer for multilabel classifiction.
-			
-    """
-    def __init__(self, num_classes):
-        """ Initialize Discriminator Class with num_classes."""
-        super(Discriminator, self).__init__()
-
-        self.num_classes = num_classes
-        self.conv_layers = nn.Sequential(
-                    nn.Conv2d(in_channels = 3, 
+        self.countOfClasses = countOfClasses
+        self.PackedLayersOfDisc = nn.Sequential(
+                    C2d(in_channels = 3, 
                              out_channels = 128, 
                              kernel_size = 4,
                              stride = 2,
                              padding = 1,
                              bias = False),
                     nn.LeakyReLU(0.2, inplace = True),
-                    nn.Conv2d(in_channels = 128, 
+		
+                    C2d(in_channels = 128, 
                              out_channels = 256, 
                              kernel_size = 4,
                              stride = 2,
                              padding = 1,
                              bias = False),
-                    nn.BatchNorm2d(256),
+                    BN2d(256),
                     nn.LeakyReLU(0.2, inplace = True),
-                    nn.Conv2d(in_channels = 256, 
+		
+                    C2d(in_channels = 256, 
                              out_channels = 512, 
                              kernel_size = 4,
                              stride = 2,
                              padding = 1,
                              bias = False),
-                    nn.BatchNorm2d(512),
+                    BN2d(512),
                     nn.LeakyReLU(0.2, inplace = True),
-                    nn.Conv2d(in_channels = 512, 
+		
+                    C2d(in_channels = 512, 
                              out_channels = 1024, 
                              kernel_size = 4,
                              stride = 2,
                              padding = 1,
                              bias = False),
-                    nn.BatchNorm2d(1024),
+                    BN2d(1024),
                     nn.LeakyReLU(0.2, inplace = True)
-                    )   
-        self.discriminator_layer = nn.Sequential(
-                    nn.Conv2d(in_channels = 1024, 
-                             out_channels = 1, 
-                             kernel_size = 4,
-                             stride = 1),
+                    )  
+	
+	
+        self.bin_classifier = nn.Sequential(
+                    C2d(in_channels = 1024, 
+                        out_channels = 1, 
+                        kernel_size = 4,
+                        stride = 1),
                     nn.Sigmoid()
                     ) 
-        self.bottleneck = nn.Sequential(
-                    nn.Conv2d(in_channels = 1024, 
-                             out_channels = 512, 
-                             kernel_size = 4,
-                             stride = 1),
-                    nn.BatchNorm2d(512),
+	
+	
+        self.extraBotNeck = nn.Sequential(
+                    C2d(in_channels = 1024, 
+                        out_channels = 512, 
+                        kernel_size = 4,
+                        stride = 1),
+                    BN2d(512),
                     nn.LeakyReLU(0.2)
                     )
-        self.classifier_layer = nn.Sequential(
-                    nn.Linear(512, self.num_classes),
+	
+        self.multilableClassificationLayer = nn.Sequential(
+                    nn.Linear(512, self.countOfClasses),
                     nn.Sigmoid()
                     )
-
         return
     
-    def forward(self, _input):
-        """ Defines a forward pass of a discriminator.
-        Args:
-            _input: A batch of image tensors. Shape: N * 3 * 64 *64
-        
-        Returns:
-            discrim_output: Value between 0-1 indicating real or fake. Shape: N * 1
-            aux_output: Class scores for each class. Shape: N * num_classes
-        """
-
-        features = self.conv_layers(_input)  
-        discrim_output = self.discriminator_layer(features).view(-1) # Single-value scalar
-        flatten = self.bottleneck(features).squeeze()
-        aux_output = self.classifier_layer(flatten) # Outputs probability for each class label
-        return discrim_output, aux_output
+    def forward(self, ipBatch):
+	
+        extrFeat = self.PackedLayersOfDisc(ipBatch)  
+        realOrFake = self.bin_classifier(extrFeat).view(-1) 
+        flatten = self.extraBotNeck(extrFeat).squeeze()
+        multiLabOutput = self.multilableClassificationLayer(flatten)
+        return realOrFake, multiLabOutput
 
 if __name__ == '__main__':
-    latent_dim = 100
-    class_dim = 22
-    batch_size = 5
-    z = torch.randn(batch_size, latent_dim)
-    c = torch.randn(batch_size, class_dim)
+    latentVectorSize = 100
+    classVectorSize = 22
+    batch = 5
+    z = torch.randn(batch, latentVectorSize)
+    c = torch.randn(batch, classVectorSize)
     
-    G = Generator(latent_dim, class_dim)
-    D = Discriminator(class_dim)
-    o = G(z, c)
-    print(o.shape)
-    x, y = D(o)
-    print(x.shape, y.shape)
+    GenObject = MyConGANGen(latentVectorSize, classVectorSize)
+    DiscObject = MyConGANDisc(classVectorSize)
+    o = GenObject(z, c)
+#     print(o.shape)
+    x, y = DiscObject(o)
+#     print(x.shape, y.shape)
