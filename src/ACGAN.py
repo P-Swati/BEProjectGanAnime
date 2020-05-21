@@ -142,12 +142,12 @@ if __name__ == '__main__':
     latentVectorSize = 100
     classVectorSize = 22
     batch = 5
-    z = torch.randn(batch, latentVectorSize)
-    c = torch.randn(batch, classVectorSize)
+    lVec = torch.randn(batch, latentVectorSize)
+    cVec = torch.randn(batch, classVectorSize)
     
     GenObject = MyConGANGen(latentVectorSize, classVectorSize)
     DiscObject = MyConGANDisc(classVectorSize)
-    o = GenObject(z, c)
+    o = GenObject(lVec, cVec)
 #     print(o.shape)
     x, y = DiscObject(o)
 #     print(x.shape, y.shape)
