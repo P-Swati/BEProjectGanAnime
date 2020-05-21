@@ -27,17 +27,18 @@ for i in range(len(eyeClassesList)):
     eye_dict[eyeClassesList[i]]=i
 
 
-def generateUsingHairEye(model, device, hair_classes, eye_classes, lDim, hColor, eColor):
-    htag = torch.zeros(64, hair_classes).to(device)
-    etag = torch.zeros(64, eye_classes).to(device)
+def generateUsingHairEye(model, device, hairClasses, eyeClasses, lDim, hColor, eColor):
+    vecSize=64
+    htag = torch.zeros(vecSize, hairClasses).to(device)
+    etag = torch.zeros(vecSize, eyeClasses).to(device)
     hairLabelIndex = hair_dict[hColor]
     eyeLabelIndex = eye_dict[eColor]
-    for i in range(64):
-        htag[i][hairLabelIndex]=1
+    for i in range(vecSize):
+        htag[i][hairLabelIndex] = 1
         etag[i][eyeLabelIndex] = 1
     
     fulltag = torch.cat((htag, etag), 1)
-    z = torch.randn(64, lDim).to(device)
+    z = torch.randn(vecSize, lDim).to(device)
     
     output = model(z, fulltag)
     save_image(utils.denorm(output), '../generated/{} hair {} eyes.png'.format(hairClassesList[hairLabelIndex], eyeClassesList[eyeLabelIndex]))
